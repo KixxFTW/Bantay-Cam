@@ -1,4 +1,4 @@
-
+declare module "*.png";
 /**
  * SafeTrack Nominal/Branded Types
  */
