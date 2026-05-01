@@ -1,0 +1,8 @@
+{
+  "name": "Bantay Cam",
+  "description": "AI-powered mobile hazard and safety detection system using Gemini Vision API.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
