@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { CameraSource, ErrorType, ErrorSeverity, DeviceId, asDeviceId } from '../types';
 import { errorService } from '../services/errorService';
 
+const VIRTUAL_CAMERA_PATTERN = /(virtual|obs|bytecast|l?svcam)/i;
+
 export const useCameraDevices = () => {
   const [cameraSources, setCameraSources] = useState<CameraSource[]>([]);
   const [primaryCameraId, setPrimaryCameraId] = useState<DeviceId | null>(null);
@@ -16,8 +18,12 @@ export const useCameraDevices = () => {
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      const physicalVideoDevices = videoDevices.filter(
+        (device) => !VIRTUAL_CAMERA_PATTERN.test(device.label || '')
+      );
       
-      const sources: CameraSource[] = videoDevices.map((device, index) => ({
+      const preferredDevices = physicalVideoDevices.length > 0 ? physicalVideoDevices : videoDevices;
+      const sources: CameraSource[] = preferredDevices.map((device, index) => ({
         id: asDeviceId(device.deviceId),
         label: device.label || `Camera ${index + 1}`,
       }));

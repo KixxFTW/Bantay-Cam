@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { CameraMode, SecurityStatus, DeviceId } from './types';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { CameraMode, SecurityStatus, DeviceId, ThreatRecording, asLogId } from './types';
 
 // Components
 import CameraFeed from './components/CameraFeed';
@@ -26,6 +26,13 @@ const App: React.FC = () => {
   const [connectionAlert, setConnectionAlert] = useState<string | null>(null);
   const [unhealthyCameraIds, setUnhealthyCameraIds] = useState<Set<DeviceId>>(new Set());
   const [isMobileLogOpen, setIsMobileLogOpen] = useState(false);
+  const [recordings, setRecordings] = useState<ThreatRecording[]>([]);
+  const [recordingTrigger, setRecordingTrigger] = useState(0);
+  const [lastRecordingReason, setLastRecordingReason] = useState('Threat detected');
+  const lastRecordingAtRef = useRef(0);
+  const recordingsRef = useRef<ThreatRecording[]>([]);
+  const lastSensorDangerLevelRef = useRef<'LOW' | 'MEDIUM' | 'HIGH'>('LOW');
+  const lastSensorLogAtRef = useRef(0);
 
   // Hook orchestration
   const { cameraSources, primaryCameraId, setPrimaryCameraId, isLoading: isHardwareLoading } = useCameraDevices();
@@ -57,12 +64,43 @@ const App: React.FC = () => {
     onAnalysisComplete: (result) => {
       addLog(result);
       void handleSmsAnalysis(result);
-      if (result.status === SecurityStatus.DANGER && window.navigator.vibrate) {
+      const hasThreat = result.status !== SecurityStatus.SAFE;
+      const canRecord = Date.now() - lastRecordingAtRef.current > 15_000;
+      if (hasThreat && canRecord) {
+        lastRecordingAtRef.current = Date.now();
+        setLastRecordingReason(result.hazards[0] || `${result.status} threat detected`);
+        setRecordingTrigger((prev) => prev + 1);
+      }
+      if (window.navigator.vibrate) {
         window.navigator.vibrate([500, 100, 500]);
       }
     },
-    rateLimitMs: scanInterval
+    rateLimitMs: 3000
   });
+
+  const handleRecordingReady = useCallback((payload: { url: string; sourceLabel: string }) => {
+    setRecordings((prev) => {
+      const next = [
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toLocaleString(),
+          sourceLabel: payload.sourceLabel,
+          reason: lastRecordingReason,
+          url: payload.url,
+        },
+        ...prev,
+      ].slice(0, 10);
+
+      if (prev.length >= 10) {
+        const removed = prev[prev.length - 1];
+        if (removed) {
+          URL.revokeObjectURL(removed.url);
+        }
+      }
+
+      return next;
+    });
+  }, [lastRecordingReason]);
 
   // Reset unhealthy cameras when hardware list changes
   useEffect(() => {
@@ -79,6 +117,58 @@ const App: React.FC = () => {
 
   const handleConnectionLost = useCallback((label: string) => {
     setConnectionAlert(`CRITICAL ERROR: Connection to ${label} was severed.`);
+  }, []);
+
+  useEffect(() => {
+    recordingsRef.current = recordings;
+  }, [recordings]);
+
+  useEffect(() => {
+    if (!isScanning) {
+      lastSensorDangerLevelRef.current = 'LOW';
+      return;
+    }
+
+    const score =
+      (sensorData.motionDetected ? 2 : 0) +
+      (sensorData.audioLevel > 80 ? 1 : 0) +
+      (sensorData.temperature > 30 ? 1 : 0);
+
+    const dangerLevel: 'LOW' | 'MEDIUM' | 'HIGH' =
+      score >= 3 ? 'HIGH' : score >= 1 ? 'MEDIUM' : 'LOW';
+
+    const now = Date.now();
+    const shouldLog =
+      dangerLevel !== 'LOW' &&
+      (dangerLevel !== lastSensorDangerLevelRef.current || now - lastSensorLogAtRef.current > 20_000);
+
+    if (shouldLog) {
+      addLog({
+        id: asLogId(crypto.randomUUID()),
+        status: dangerLevel === 'HIGH' ? SecurityStatus.DANGER : SecurityStatus.CAUTION,
+        hazards: [
+          `Sensor danger level ${dangerLevel}`,
+          sensorData.motionDetected ? 'Motion detected' : 'No motion detected',
+          `Audio ${sensorData.audioLevel.toFixed(1)} dB`,
+          `Temperature ${sensorData.temperature.toFixed(1)} C`,
+        ],
+        action:
+          dangerLevel === 'HIGH'
+            ? 'Investigate immediately and verify the scene.'
+            : 'Monitor closely and prepare for escalation.',
+        confidence: dangerLevel === 'HIGH' ? 85 : 65,
+        timestamp: new Date().toLocaleString(),
+      });
+      lastSensorLogAtRef.current = now;
+    }
+
+    lastSensorDangerLevelRef.current = dangerLevel;
+  }, [sensorData, addLog, isScanning]);
+
+  useEffect(() => {
+    return () => {
+      recordingsRef.current.forEach((clip) => URL.revokeObjectURL(clip.url));
+    };
   }, []);
 
   const toggleScanning = () => setIsScanning(prev => !prev);
@@ -104,6 +194,8 @@ const App: React.FC = () => {
                 cameraLabel={cam.label}
                 mode={cameraMode} 
                 onFrameCapture={(base64) => processFrame(base64, sensorData)} 
+                recordTriggerToken={cam.id === primaryCameraId ? recordingTrigger : 0}
+                onRecordingReady={handleRecordingReady}
                 onConnectionLost={handleConnectionLost}
                 onTerminalError={handleCameraTerminalError}
                 isScanning={isScanning} 
@@ -317,6 +409,7 @@ const App: React.FC = () => {
         <div className="hidden md:block shrink-0 shadow-2xl">
           <LiveLog 
             logs={logs} 
+            recordings={recordings}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onClear={clearLogs}
@@ -346,6 +439,7 @@ const App: React.FC = () => {
               <div className="flex-1 overflow-y-auto">
                 <LiveLog 
                   logs={logs} 
+                  recordings={recordings}
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                   onClear={clearLogs}

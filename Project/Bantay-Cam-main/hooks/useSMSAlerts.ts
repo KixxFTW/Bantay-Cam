@@ -17,6 +17,10 @@ interface SMSConfig {
   cautionCooldownMs: number;
 }
 
+const CRITICAL_HAZARD_PATTERN = /\b(knife|gun|fire|smoke)\b/i;
+const hasCriticalThreatText = (value: string | undefined) =>
+  Boolean(value && CRITICAL_HAZARD_PATTERN.test(value));
+
 export const useSMSAlerts = () => {
   const [config, setConfig] = useState<SMSConfig>({
     enabled: localStorage.getItem('sms_enabled') === 'true',
@@ -137,9 +141,13 @@ export const useSMSAlerts = () => {
 
   const handleAnalysisResult = useCallback(async (result: LogEntry) => {
     if (!config.enabled || config.recipients.length === 0) return;
-    if (result.status !== SecurityStatus.DANGER && result.status !== SecurityStatus.CAUTION) return;
+    const hasCriticalHazard = result.hazards.some(hasCriticalThreatText);
+    const hasCriticalAction = hasCriticalThreatText(result.action);
+    const shouldEscalateToDanger =
+      result.status === SecurityStatus.DANGER || hasCriticalHazard || hasCriticalAction;
+    if (!shouldEscalateToDanger && result.status !== SecurityStatus.CAUTION) return;
 
-    const severity = result.status === SecurityStatus.DANGER ? 'DANGER' : 'CAUTION';
+    const severity = shouldEscalateToDanger ? 'DANGER' : 'CAUTION';
     const cooldownKey = `${severity.toLowerCase()}_last_alert`;
     const cooldownMs = severity === 'DANGER' ? config.dangerCooldownMs : config.cautionCooldownMs;
     const lastTime = lastAlertTime[cooldownKey] || 0;

@@ -63,6 +63,14 @@ export interface LogEntry extends AnalysisResult {
   readonly id: LogId;
 }
 
+export interface ThreatRecording {
+  readonly id: string;
+  readonly createdAt: string;
+  readonly sourceLabel: string;
+  readonly reason: string;
+  readonly url: string;
+}
+
 export interface CameraSource {
   readonly id: DeviceId;
   readonly label: string;
