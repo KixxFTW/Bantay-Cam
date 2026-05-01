@@ -32,7 +32,22 @@ class SMSProxyService {
         body: JSON.stringify({ to, body }),
       });
 
-      const payload = (await response.json()) as SMSProxyResponse;
+      const rawBody = await response.text();
+      let payload: SMSProxyResponse = {
+        success: false,
+        error: `HTTP ${response.status}`,
+      };
+
+      if (rawBody) {
+        try {
+          payload = JSON.parse(rawBody) as SMSProxyResponse;
+        } catch {
+          payload = {
+            success: false,
+            error: `Non-JSON response from SMS proxy (HTTP ${response.status})`,
+          };
+        }
+      }
 
       if (!response.ok || !payload.success) {
         const message = payload.error || `HTTP ${response.status}`;
@@ -41,7 +56,13 @@ class SMSProxyService {
 
       return payload;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      const rawMessage = err instanceof Error ? err.message : 'Unknown error';
+      const isProxyUnavailable =
+        rawMessage === 'Failed to fetch' ||
+        /networkerror|network error|econnrefused|failed to fetch/i.test(rawMessage);
+      const message = isProxyUnavailable
+        ? 'SMS proxy is not reachable. Start it with: npm run dev:proxy'
+        : rawMessage;
       errorService.log({
         type: ErrorType.SYSTEM,
         severity: ErrorSeverity.HIGH,
