@@ -306,7 +306,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
   //for section navigation
   const navSections = [
     { id: "about", label: "About", offset: 0 },
-    { id: "features", label: "Features", offset: 400 },
+    { id: "features", label: "Features", offset: 600 },
     { id: "how-it-works", label: "How It Works", offset: 800 },
     { id: "designed-for", label: "Designed For", offset: 1200 },
     { id: "threats", label: "Threats", offset: 1600 },
@@ -317,17 +317,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
   // scroll listener
   useEffect(() => {
     const handleScroll = () => {
-      const scrollPos = window.scrollY;
+      const scrollPos = window.scrollY + 100;
       
-      // Check each section
       for (const section of navSections) {
-        const element = document.getElementById(section.id);
+        const element = sectionsRef.current[section.id];
         if (element) {
           const { offsetTop, offsetHeight } = element;
-          const elementBottom = offsetTop + offsetHeight;
-          
-          // If user is viewing this section
-          if (scrollPos >= offsetTop - 100 && scrollPos < elementBottom) {
+          if (scrollPos >= offsetTop && scrollPos < offsetTop + offsetHeight) {
             setActiveSection(section.id);
             break;
           }
@@ -335,13 +331,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [navSections]);
+  }, []);
 
   // Scroll to section function
   const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
+    const element = sectionsRef.current[sectionId];
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
       setActiveSection(sectionId);
@@ -468,14 +464,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                 </div>
               </section>
 
-              {/* ── ABOUT & FEATURES ── */}
+              {/* ── FEATURES GRID ── */}
               <section 
                 id="about"
-                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-cyan-500/10"
+                ref={(el) => { if (el) sectionsRef.current["about"] = el; }}
+                className="min-h-200 py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-cyan-500/10"
               >
                 <div className="max-w-6xl mx-auto">
-                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">About BantayCam</h2>
+                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">About & Features</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                    
+                    {/* About */}
                     <div>
                       <h3 className="text-xl md:text-2xl font-bold text-white mb-3">BantayCam</h3>
                       <p className="text-sm md:text-base text-slate-300 leading-relaxed mb-4">
@@ -486,25 +485,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                       </p>
                       <img src={aboutImg} alt="BantayCam" className="w-full rounded-lg object-cover max-h-80" />
                     </div>
-                  </div>
-                </div>
-              </section>
 
-              {/* ── FEATURES GRID ── */}
-              <section 
-                id="features"
-                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/60 border-t border-cyan-500/10"
-              >
-                <div className="max-w-6xl mx-auto">
-                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">Key Features</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                    {features.map((f, i) => (
-                      <div key={i} className="bg-slate-900/40 border border-blue-500/20 rounded-lg p-3">
-                        <div className="mb-2 text-blue-400 flex justify-center">{f.icon}</div>
-                        <p className="text-xs md:text-sm font-bold text-white mb-1 text-center">{f.title}</p>
-                        <p className="text-[11px] text-slate-500 leading-snug text-center">{f.desc}</p>
+                    {/* Features Grid */}
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Key Features</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {features.map((f, i) => (
+                          <div key={i} className="bg-slate-900/40 border border-blue-500/20 rounded-lg p-3">
+                            <div className="mb-2 text-blue-400">{f.icon}</div>
+                            <p className="text-xs md:text-sm font-bold text-white mb-1">{f.title}</p>
+                            <p className="text-[11px] text-slate-500 leading-snug">{f.desc}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </section>
