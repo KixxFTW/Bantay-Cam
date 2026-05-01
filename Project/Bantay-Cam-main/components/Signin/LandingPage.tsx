@@ -481,15 +481,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between gap-4 md:gap-6">
                   <div>
                     <p className="text-sm md:text-base italic text-blue-400 font-serif">Bright future starts here.</p>
+                    <p className="font-bold text-white">URDANETA CITY UNIVERSITY</p>
+                      <p className="text-slate-500 text-[10px]">COLLEGE OF ENGINEERING</p>
                   </div>
                   <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6 text-xs md:text-sm">
                     <div>
-                      <p className="font-bold text-white">URDANETA CITY UNIVERSITY</p>
-                      <p className="text-slate-500 text-[10px]">COLLEGE OF ENGINEERING</p>
+                      <p className="font-bold text-white">BantayCam</p>
+                      <p className="text-slate-500 text-[10px]">©BantayCam2026</p>
                     </div>
                     <div className="flex items-center gap-2 text-slate-400">
                       <MapPinIcon size={12} />
-                      <span className="text-[10px]">Urdaneta City, Pangasinan</span>
+                      <span className="text-[10px]">1 San Vicente West Urdaneta City Pangasinan 2428</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-400">
                       <PhoneIcon size={12} />

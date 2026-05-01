@@ -1,11 +1,29 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bantay Cam</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>Bantay Cam - AI Smart CCTV</title>
+    
+    <!-- Favicon with SVG -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306b6d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L3 7V17L12 22L21 17V7L12 2Z'/><circle cx='12' cy='12' r='3'/></svg>" />
+    
+    <!-- Fallback PNG favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    
+    <!-- Apple touch icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180' fill='%2306b6d4'><rect width='180' height='180' fill='%23001f3f' rx='40'/><path d='M90 36L45 63V117L90 144L135 117V63L90 36Z' stroke='%2306b6d4' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/><circle cx='90' cy='90' r='9' stroke='%2306b6d4' stroke-width='3' fill='none'/></svg>" />
+    
+    <!-- Meta tags -->
+    <meta name="theme-color" content="#06b6d4" />
+    <meta name="description" content="Bantay Cam - AI-powered smart CCTV monitoring system with real-time threat detection" />
+    <meta name="keywords" content="CCTV, Security, AI Detection, Monitoring, Smart Home" />
+    <meta property="og:title" content="Bantay Cam - AI Smart CCTV" />
+    <meta property="og:description" content="Real-time threat detection and monitoring" />
+    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306b6d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L3 7V17L12 22L21 17V7L12 2Z'/><circle cx='12' cy='12' r='3'/></svg>" />
+    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
+    
     <style>
       body {
         font-family: 'Inter', sans-serif;
@@ -30,7 +48,8 @@
         background: #64748b; 
       }
     </style>
-  <script type="importmap">
+    
+    <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.1",
@@ -40,8 +59,8 @@
     "zod": "https://cdn.jsdelivr.net/npm/zod@3.24.1/+esm"
   }
 }
-</script>
-</head>
+    </script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
