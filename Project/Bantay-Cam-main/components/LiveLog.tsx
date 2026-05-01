@@ -11,6 +11,18 @@ interface LiveLogProps {
 }
 
 const LiveLog: React.FC<LiveLogProps> = ({ logs, recordings, searchQuery, onSearchChange, onClear }) => {
+  const toSafeFilename = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32) || 'clip';
+
+  const buildClipFilename = (clip: ThreatRecording) => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return `bantay-${toSafeFilename(clip.sourceLabel)}-${toSafeFilename(clip.reason)}-${timestamp}.webm`;
+  };
+
   const getStatusColor = (status: SecurityStatus) => {
     switch (status) {
       case SecurityStatus.DANGER: return 'text-red-400 border-red-800 bg-red-950/35';
@@ -111,9 +123,19 @@ const LiveLog: React.FC<LiveLogProps> = ({ logs, recordings, searchQuery, onSear
               {recordings.map((clip) => (
                 <div key={clip.id} className="border border-slate-700 bg-slate-950/60 rounded p-2">
                   <div className="text-[9px] text-slate-400 mb-1">{clip.createdAt}</div>
-                  <div className="text-[10px] text-slate-300 mb-1">
+                  <div className="text-[10px] text-slate-300 mb-2">
                     {clip.sourceLabel} - {clip.reason}
                   </div>
+                  <a
+                    href={clip.url}
+                    download={buildClipFilename(clip)}
+                    className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-cyan-300 hover:text-cyan-200 border border-cyan-700/40 hover:border-cyan-500/60 rounded px-2 py-1 mb-2 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Clip
+                  </a>
                   <video controls src={clip.url} className="w-full rounded bg-black" />
                 </div>
               ))}
