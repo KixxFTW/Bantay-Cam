@@ -1,9 +1,9 @@
 import http from 'node:http';
 
 const PORT = Number(process.env.SMS_PROXY_PORT || 8787);
-const CLICKSEND_USERNAME = process.env.CLICKSEND_USERNAME;
-const CLICKSEND_API_KEY = process.env.CLICKSEND_API_KEY;
-const CLICKSEND_API_URL = 'https://rest.clicksend.com/v3';
+const IPROG_API_TOKEN = process.env.IPROG_API_TOKEN;
+const IPROG_SMS_PROVIDER = process.env.IPROG_SMS_PROVIDER;
+const IPROG_API_BASE = process.env.IPROG_API_BASE || 'https://sms.iprogtech.com/api/v1';
 
 const sendJson = (res, statusCode, payload) => {
   res.writeHead(statusCode, {
@@ -18,6 +18,31 @@ const tryParseJson = (value) => {
   } catch {
     return null;
   }
+};
+
+const normalizeUpstreamError = (payload, rawFallback, httpStatus, providerLabel) => {
+  const candidates = [payload?.message, payload?.detail, payload?.error];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate.map((item) => String(item)).join('; ');
+    }
+  }
+  return rawFallback || `${providerLabel} HTTP ${httpStatus}`;
+};
+
+const mapUpstreamStatusToProxyStatus = (upstreamHttpStatus, upstreamError) => {
+  if (upstreamHttpStatus >= 400 && upstreamHttpStatus < 500) return 400;
+  const message = typeof upstreamError === 'string' ? upstreamError.toLowerCase() : '';
+  const looksLikeValidationOrPolicy =
+    message.includes('sender name') ||
+    message.includes('smart/tnt') ||
+    message.includes('invalid phone') ||
+    message.includes('invalid format') ||
+    message.includes('validation');
+  if (looksLikeValidationOrPolicy) return 400;
+  if (message.includes('invalid token') || message.includes('unauthorized')) return 401;
+  return 502;
 };
 
 const parseBody = (req) =>
@@ -41,10 +66,10 @@ const parseBody = (req) =>
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/sms/send') {
-    if (!CLICKSEND_USERNAME || !CLICKSEND_API_KEY) {
+    if (!IPROG_API_TOKEN) {
       return sendJson(res, 500, {
         success: false,
-        error: 'Server ClickSend credentials are not configured',
+        error: 'Server IPROG API token is not configured',
       });
     }
 
@@ -60,56 +85,63 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      const auth = Buffer.from(`${CLICKSEND_USERNAME}:${CLICKSEND_API_KEY}`).toString('base64');
-      const clicksendResponse = await fetch(`${CLICKSEND_API_URL}/sms/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              to,
-              body: messageBody,
-              from: 'BantayCam',
-              custom_string: `bantay_${Date.now()}`,
-            },
-          ],
-        }),
+      const form = new URLSearchParams({
+        api_token: IPROG_API_TOKEN,
+        phone_number: to,
+        message: messageBody,
       });
 
-      const clicksendRaw = await clicksendResponse.text();
-      const clicksendPayload = tryParseJson(clicksendRaw);
+      if (IPROG_SMS_PROVIDER && IPROG_SMS_PROVIDER.trim()) {
+        form.set('sms_provider', IPROG_SMS_PROVIDER.trim());
+      }
 
-      if (!clicksendResponse.ok) {
-        const upstreamError =
-          clicksendPayload?.response_msg ||
-          clicksendPayload?.errors?.[0]?.error ||
-          clicksendRaw ||
-          `ClickSend HTTP ${clicksendResponse.status}`;
-        return sendJson(res, 502, {
+      const providerResponse = await fetch(`${IPROG_API_BASE}/sms_messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: form.toString(),
+      });
+
+      const providerRaw = await providerResponse.text();
+      const providerPayload = tryParseJson(providerRaw);
+
+      if (!providerResponse.ok) {
+        const upstreamError = normalizeUpstreamError(
+          providerPayload,
+          providerRaw,
+          providerResponse.status,
+          'IPROG API'
+        );
+        return sendJson(res, mapUpstreamStatusToProxyStatus(providerResponse.status, upstreamError), {
           success: false,
           error: upstreamError,
         });
       }
 
-      const message = clicksendPayload?.data?.messages?.[0];
-      if (message?.status !== 'SUCCESS') {
-        return sendJson(res, 502, {
+      const messageId = providerPayload?.message_id || providerPayload?.data?.message_id;
+      const statusCode = Number(providerPayload?.status);
+      const isAccepted = statusCode === 200 || Boolean(messageId);
+
+      if (!isAccepted) {
+        const upstreamError =
+          normalizeUpstreamError(
+            providerPayload,
+            providerRaw,
+            providerResponse.status,
+            'IPROG SMS API'
+          ) || 'IPROG SMS API rejected message';
+
+        return sendJson(res, mapUpstreamStatusToProxyStatus(providerResponse.status, upstreamError), {
           success: false,
-          error:
-            message?.error ||
-            clicksendPayload?.response_msg ||
-            clicksendRaw ||
-            'ClickSend rejected message',
+          error: upstreamError,
         });
       }
 
       return sendJson(res, 200, {
         success: true,
         data: {
-          message_id: message.message_id,
+          message_id: messageId || 'queued',
           status: 'sent',
         },
       });

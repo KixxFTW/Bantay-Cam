@@ -1,45 +1,22 @@
 
 import React from 'react';
-import { LogEntry, SecurityStatus, ThreatRecording } from '../types';
+import { LogEntry, SecurityStatus } from '../types';
 
 interface LiveLogProps {
   logs: LogEntry[];
-  recordings: ThreatRecording[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onClear: () => void;
 }
 
-const LiveLog: React.FC<LiveLogProps> = ({ logs, recordings, searchQuery, onSearchChange, onClear }) => {
-  const toSafeFilename = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 32) || 'clip';
-
-  const buildClipFilename = (clip: ThreatRecording) => {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return `bantay-${toSafeFilename(clip.sourceLabel)}-${toSafeFilename(clip.reason)}-${timestamp}.webm`;
-  };
-
+const LiveLog: React.FC<LiveLogProps> = ({ logs, searchQuery, onSearchChange, onClear }) => {
   const getStatusColor = (status: SecurityStatus) => {
     switch (status) {
-      case SecurityStatus.DANGER: return 'text-red-400 border-red-800 bg-red-950/35';
-      case SecurityStatus.CAUTION: return 'text-amber-300 border-amber-800 bg-amber-950/35';
-      case SecurityStatus.SAFE: return 'text-emerald-300 border-emerald-800 bg-emerald-950/35';
+      case SecurityStatus.DANGER: return 'text-red-500 border-red-900 bg-red-950/30';
+      case SecurityStatus.CAUTION: return 'text-amber-400 border-amber-900 bg-amber-950/30';
+      case SecurityStatus.SAFE: return 'text-emerald-400 border-emerald-900 bg-emerald-950/30';
       default: return 'text-slate-400 border-slate-800';
     }
-  };
-
-  const getDescription = (log: LogEntry) => {
-    if (log.status === SecurityStatus.DANGER) {
-      return 'Immediate threat detected. Security response required now.';
-    }
-    if (log.status === SecurityStatus.CAUTION) {
-      return 'Suspicious activity detected. Verify scene and prepare response.';
-    }
-    return 'Scene appears safe. Continue normal monitoring.';
   };
 
   return (
@@ -86,17 +63,7 @@ const LiveLog: React.FC<LiveLogProps> = ({ logs, recordings, searchQuery, onSear
                 <span className="font-bold">{log.confidence}% REL</span>
               </div>
               
-              <div className="font-bold text-xs my-1 flex items-center gap-2">
-                <span className={`inline-block w-2 h-2 rounded-full ${
-                  log.status === SecurityStatus.DANGER
-                    ? 'bg-red-400'
-                    : log.status === SecurityStatus.CAUTION
-                      ? 'bg-amber-300'
-                      : 'bg-emerald-300'
-                }`}></span>
-                {log.status}
-              </div>
-              <div className="text-[9px] opacity-85 mb-1 leading-tight">{getDescription(log)}</div>
+              <div className="font-bold text-xs my-1">{log.status}</div>
 
               {log.hazards.length > 0 && (
                 <ul className="list-disc list-inside mb-1 opacity-90 pl-1 leading-normal">
@@ -111,37 +78,6 @@ const LiveLog: React.FC<LiveLogProps> = ({ logs, recordings, searchQuery, onSear
             </div>
           ))
         )}
-
-        <div className="pt-2 border-t border-slate-800/70 mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 mb-2">
-            Threat Recordings
-          </div>
-          {recordings.length === 0 ? (
-            <div className="text-[10px] text-slate-500">No recordings yet.</div>
-          ) : (
-            <div className="space-y-3">
-              {recordings.map((clip) => (
-                <div key={clip.id} className="border border-slate-700 bg-slate-950/60 rounded p-2">
-                  <div className="text-[9px] text-slate-400 mb-1">{clip.createdAt}</div>
-                  <div className="text-[10px] text-slate-300 mb-2">
-                    {clip.sourceLabel} - {clip.reason}
-                  </div>
-                  <a
-                    href={clip.url}
-                    download={buildClipFilename(clip)}
-                    className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-cyan-300 hover:text-cyan-200 border border-cyan-700/40 hover:border-cyan-500/60 rounded px-2 py-1 mb-2 transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download Clip
-                  </a>
-                  <video controls src={clip.url} className="w-full rounded bg-black" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

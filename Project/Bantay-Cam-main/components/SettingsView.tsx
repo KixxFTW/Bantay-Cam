@@ -82,7 +82,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         <h3 className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] px-2">SMS Alerts</h3>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3 sm:space-y-4">
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] text-amber-300 leading-snug">
-            Frontend ClickSend keys are for local development only. Use a backend proxy for production to keep credentials secure.
+            Frontend SMS keys are for local development only. Use a backend proxy with IPROG TECH in production to keep credentials secure.
           </div>
 
           <div className="flex items-center justify-between gap-2">

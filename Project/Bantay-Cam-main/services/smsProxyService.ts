@@ -77,7 +77,7 @@ class SMSProxyService {
         type: ErrorType.SYSTEM,
         severity: ErrorSeverity.HIGH,
         message: 'Failed to send SMS via backend proxy',
-        actionRequired: 'Verify backend proxy and ClickSend credentials',
+        actionRequired: 'Verify backend proxy and IPROG API token',
         context: { error: message, to },
       });
       return {

@@ -313,8 +313,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
             
             {/* Logo */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-blue-500/20 border border-blue-600/40 flex items-center justify-center text-blue-400 flex-shrink-0">
-                <ShieldIcon size={16} />
+              <div className="w-8 md:w-9 h-8 md:h-9 flex-shrink-0 flex items-center justify-center bg-cyan-500/10 rounded-lg md:rounded-xl border border-cyan-500/20">
+              <svg className="w-4 md:w-5 h-4 md:h-5 text-cyan-500" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L3 7V17L12 22L21 17V7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
               </div>
               <div className="min-w-0">
                 <p className="font-bold text-xs md:text-base text-white leading-tight truncate">BANTAYCAM</p>
@@ -344,7 +347,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
           {panel === "hero" && (
             <>
               {/* ── HERO SECTION ── */}
-              <section className="relative min-h-auto md:min-h-96 py-8 md:py-20 px-3 sm:px-6 md:px-8 flex flex-col md:flex-row items-center gap-6 md:gap-0" style={{ backgroundImage: `url(${bgImg})`, backgroundPosition: "center", backgroundSize: "cover" }}>
+              <section className="relative min-h-auto md:min-h-200 py-8 md:py-20 px-3 sm:px-6 md:px-8 flex flex-col md:flex-row items-center gap-6 md:gap-0" style={{ backgroundImage: `url(${bgImg})`, backgroundPosition: "center", backgroundSize: "cover" }}>
                 
                 {/* Hero Content */}
                 <div className="flex-1 flex flex-col justify-center z-10">
@@ -380,7 +383,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
               </section>
 
               {/* ── FEATURES GRID ── */}
-              <section className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-blue-500/10">
+              <section className="margin-top:50 min-h-225 py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-blue-500/10">
                 <div className="max-w-6xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">About & Features</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
@@ -394,7 +397,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                       <p className="text-sm text-slate-400 leading-relaxed mb-4">
                         Unlike regular CCTV that only records video, BantayCam analyzes live camera feeds using artificial intelligence to identify potential dangers such as burglary, weapons, and fire.
                       </p>
-                      <img src={aboutImg} alt="BantayCam" className="w-full rounded-lg object-cover max-h-48" />
+                      <img src={aboutImg} alt="BantayCam" className="w-full rounded-lg object-cover max-h-80" />
                     </div>
 
                     {/* Features Grid */}
