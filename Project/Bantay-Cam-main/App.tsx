@@ -439,7 +439,6 @@ const App: React.FC = () => {
               <div className="flex-1 overflow-y-auto">
                 <LiveLog 
                   logs={logs} 
-                  recordings={recordings}
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                   onClear={clearLogs}

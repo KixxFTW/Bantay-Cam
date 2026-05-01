@@ -174,6 +174,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showCameraPrompt, setShowCameraPrompt] = useState(false);
 
+  // Add state for scroll position
+  const [activeSection, setActiveSection] = useState("about");
+  const sectionsRef = useRef<{ [key: string]: HTMLElement | null }>({});
+
   const resetForm = () => {
     setEmail("");
     setPassword("");
@@ -299,7 +303,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
     { title: "7. Modifications", body: "BantayCam reserves the right to update these Terms and Regulations at any time. Continued use of the service after changes are posted constitutes your acceptance of the new terms." },
   ];
 
+  //for section navigation
+  const navSections = [
+    { id: "about", label: "About", offset: 0 },
+    { id: "features", label: "Features", offset: 400 },
+    { id: "how-it-works", label: "How It Works", offset: 800 },
+    { id: "designed-for", label: "Designed For", offset: 1200 },
+    { id: "threats", label: "Threats", offset: 1600 },
+  ];
+
   const sectionDivider = "1px solid rgba(59,130,246,0.1)";
+
+  // scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPos = window.scrollY;
+      
+      // Check each section
+      for (const section of navSections) {
+        const element = document.getElementById(section.id);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          const elementBottom = offsetTop + offsetHeight;
+          
+          // If user is viewing this section
+          if (scrollPos >= offsetTop - 100 && scrollPos < elementBottom) {
+            setActiveSection(section.id);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [navSections]);
+
+  // Scroll to section function
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveSection(sectionId);
+    }
+  };
 
   return (
     <div className="relative min-h-screen w-full text-white flex flex-col overflow-x-hidden" style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
@@ -308,37 +355,76 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
       <div className="relative flex flex-col" style={{ zIndex: 1, minHeight: "100vh" }}>
         
         {/* ── RESPONSIVE NAV ── */}
-        <header className="sticky top-0 z-100 h-auto md:h-16 bg-slate-900/90 backdrop-blur-md border-b border-blue-500/15">
-          <div className="px-3 sm:px-4 md:px-8 py-3 md:py-0 md:h-full flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0">
+        <header className="sticky top-0 z-50 h-auto md:h-20 bg-slate-900/95 backdrop-blur-md border-b border-cyan-500/20">
+          <div className="px-3 sm:px-4 md:px-8 py-3 md:py-0 md:h-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
             
             {/* Logo */}
-            <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto flex-shrink-0">
               <div className="w-8 md:w-9 h-8 md:h-9 flex-shrink-0 flex items-center justify-center bg-cyan-500/10 rounded-lg md:rounded-xl border border-cyan-500/20">
-              <svg className="w-4 md:w-5 h-4 md:h-5 text-cyan-500" viewBox="0 0 24 24" fill="none">
+                <svg className="w-4 md:w-5 h-4 md:h-5 text-cyan-500" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2L3 7V17L12 22L21 17V7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
                 </svg>
               </div>
               <div className="min-w-0">
                 <p className="font-bold text-xs md:text-base text-white leading-tight truncate">BANTAYCAM</p>
-                <p className="text-[8px] md:text-[9px] text-blue-400 font-mono uppercase tracking-widest truncate">AI Smart CCTV</p>
+                <div className="hidden sm:flex items-center gap-2 text-[8px] md:text-[9px] text-cyan-400 font-mono uppercase tracking-widest">
+                  <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></span>
+                  <span className="truncate">Active Monitoring</span>
+                </div>
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex gap-2 w-full md:w-auto">
+            {/* Navigation Links */}
+            <div className="hidden lg:flex items-center gap-1 flex-1 justify-center ml-8">
+              {navSections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                    activeSection === section.id
+                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                  }`}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 w-full md:w-auto justify-end">
               <button
                 onClick={openLogin}
-                className="flex-1 md:flex-none px-3 py-2 text-xs md:text-sm font-bold rounded-lg bg-transparent border border-white/25 text-white hover:border-white/50 transition-colors"
+                className="px-3 py-2 text-xs md:text-sm font-bold rounded-lg bg-transparent border border-white/25 text-white hover:border-white/50 transition-colors"
               >
                 LOG IN
               </button>
               <button
                 onClick={openSignup}
-                className="flex-1 md:flex-none px-3 py-2 text-xs md:text-sm font-bold rounded-lg bg-blue-600 border border-blue-500 text-white hover:bg-blue-500 transition-colors"
+                className="px-3 py-2 text-xs md:text-sm font-bold rounded-lg bg-cyan-600 border border-cyan-500 text-white hover:bg-cyan-500 transition-colors"
               >
                 SIGN UP
               </button>
+            </div>
+          </div>
+
+          {/* Mobile Navigation Menu */}
+          <div className="lg:hidden border-t border-slate-800 bg-slate-950/50 px-3 py-2">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {navSections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={`px-3 py-1.5 text-[11px] font-semibold rounded-md whitespace-nowrap flex-shrink-0 transition-all ${
+                    activeSection === section.id
+                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                      : "text-slate-400 hover:text-white bg-slate-800/30"
+                  }`}
+                >
+                  {section.label}
+                </button>
+              ))}
             </div>
           </div>
         </header>
@@ -382,13 +468,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                 </div>
               </section>
 
-              {/* ── FEATURES GRID ── */}
-              <section className="margin-top:50 min-h-225 py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-blue-500/10">
+              {/* ── ABOUT & FEATURES ── */}
+              <section 
+                id="about"
+                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-cyan-500/10"
+              >
                 <div className="max-w-6xl mx-auto">
-                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">About & Features</h2>
+                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">About BantayCam</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                    
-                    {/* About */}
                     <div>
                       <h3 className="text-xl md:text-2xl font-bold text-white mb-3">BantayCam</h3>
                       <p className="text-sm md:text-base text-slate-300 leading-relaxed mb-4">
@@ -399,26 +486,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
                       </p>
                       <img src={aboutImg} alt="BantayCam" className="w-full rounded-lg object-cover max-h-80" />
                     </div>
+                  </div>
+                </div>
+              </section>
 
-                    {/* Features Grid */}
-                    <div>
-                      <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Key Features</h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        {features.map((f, i) => (
-                          <div key={i} className="bg-slate-900/40 border border-blue-500/20 rounded-lg p-3">
-                            <div className="mb-2 text-blue-400">{f.icon}</div>
-                            <p className="text-xs md:text-sm font-bold text-white mb-1">{f.title}</p>
-                            <p className="text-[11px] text-slate-500 leading-snug">{f.desc}</p>
-                          </div>
-                        ))}
+              {/* ── FEATURES GRID ── */}
+              <section 
+                id="features"
+                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/60 border-t border-cyan-500/10"
+              >
+                <div className="max-w-6xl mx-auto">
+                  <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6">Key Features</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                    {features.map((f, i) => (
+                      <div key={i} className="bg-slate-900/40 border border-blue-500/20 rounded-lg p-3">
+                        <div className="mb-2 text-blue-400 flex justify-center">{f.icon}</div>
+                        <p className="text-xs md:text-sm font-bold text-white mb-1 text-center">{f.title}</p>
+                        <p className="text-[11px] text-slate-500 leading-snug text-center">{f.desc}</p>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </section>
 
               {/* ── HOW IT WORKS ── */}
-              <section className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/40 border-t border-blue-500/10">
+              <section 
+                id="how-it-works"
+                ref={(el) => { if (el) sectionsRef.current["how-it-works"] = el; }}
+                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/40 border-t border-cyan-500/10"
+              >
                 <div className="max-w-5xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6 text-center">How BantayCam Works</h2>
                   <div className="flex flex-col md:flex-row gap-3 md:gap-2">
@@ -445,7 +541,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
               </section>
 
               {/* ── DESIGNED FOR ── */}
-              <section className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-blue-500/10">
+              <section 
+                id="designed-for"
+                ref={(el) => { if (el) sectionsRef.current["designed-for"] = el; }}
+                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-950/60 border-t border-cyan-500/10"
+              >
                 <div className="max-w-5xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6 text-center">Designed for You</h2>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
@@ -461,7 +561,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
               </section>
 
               {/* ── THREAT DETECTION ── */}
-              <section className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/40 border-t border-blue-500/10">
+              <section 
+                id="threats"
+                ref={(el) => { if (el) sectionsRef.current["threats"] = el; }}
+                className="py-8 md:py-12 px-3 sm:px-6 md:px-8 bg-slate-900/40 border-t border-cyan-500/10"
+              >
                 <div className="max-w-5xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold text-blue-400 uppercase mb-6 text-center">Detects Real Threats</h2>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -477,7 +581,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAuthenticated }) => {
               </section>
 
               {/* ── FOOTER ── */}
-              <footer className="bg-slate-950 border-t border-blue-500/10 py-6 md:py-8 px-3 sm:px-6 md:px-8 text-center md:text-left">
+              <footer className="bg-slate-950 border-t border-cyan-500/10 py-6 md:py-8 px-3 sm:px-6 md:px-8 text-center md:text-left">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between gap-4 md:gap-6">
                   <div>
                     <p className="text-sm md:text-base italic text-blue-400 font-serif">Bright future starts here.</p>
