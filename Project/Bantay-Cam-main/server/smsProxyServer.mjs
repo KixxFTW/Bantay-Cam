@@ -12,6 +12,14 @@ const sendJson = (res, statusCode, payload) => {
   res.end(JSON.stringify(payload));
 };
 
+const tryParseJson = (value) => {
+  try {
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+};
+
 const parseBody = (req) =>
   new Promise((resolve, reject) => {
     let data = '';
@@ -71,12 +79,14 @@ const server = http.createServer(async (req, res) => {
         }),
       });
 
-      const clicksendPayload = await clicksendResponse.json();
+      const clicksendRaw = await clicksendResponse.text();
+      const clicksendPayload = tryParseJson(clicksendRaw);
 
       if (!clicksendResponse.ok) {
         const upstreamError =
           clicksendPayload?.response_msg ||
           clicksendPayload?.errors?.[0]?.error ||
+          clicksendRaw ||
           `ClickSend HTTP ${clicksendResponse.status}`;
         return sendJson(res, 502, {
           success: false,
@@ -88,7 +98,11 @@ const server = http.createServer(async (req, res) => {
       if (message?.status !== 'SUCCESS') {
         return sendJson(res, 502, {
           success: false,
-          error: message?.error || 'ClickSend rejected message',
+          error:
+            message?.error ||
+            clicksendPayload?.response_msg ||
+            clicksendRaw ||
+            'ClickSend rejected message',
         });
       }
 

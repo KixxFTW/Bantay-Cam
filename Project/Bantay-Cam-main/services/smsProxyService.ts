@@ -38,7 +38,17 @@ class SMSProxyService {
         error: `HTTP ${response.status}`,
       };
 
-      if (rawBody) {
+      const looksLikeViteProxyFailure =
+        response.status === 500 &&
+        /econnrefused|proxy error|target server/i.test(rawBody);
+      if (looksLikeViteProxyFailure) {
+        payload = {
+          success: false,
+          error: 'SMS proxy is not reachable. Start it with: npm run dev:proxy',
+        };
+      }
+
+      if (rawBody && !looksLikeViteProxyFailure) {
         try {
           payload = JSON.parse(rawBody) as SMSProxyResponse;
         } catch {
