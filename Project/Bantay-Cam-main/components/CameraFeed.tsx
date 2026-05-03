@@ -6,7 +6,7 @@ interface CameraFeedProps {
   mode: CameraMode;
   onFrameCapture: (base64: string) => void;
   recordTriggerToken?: number;
-  onRecordingReady?: (payload: { url: string; sourceLabel: string }) => void;
+  onRecordingReady?: (payload: { url: string; sourceLabel: string; recordingType: 'session' | 'threat-clip'; reason?: string }) => void;
   onConnectionLost?: (label: string) => void;
   onTerminalError?: (id: DeviceId) => void;
   onError?: (msg: string) => void;
@@ -34,12 +34,30 @@ const CameraFeed: React.FC<CameraFeedProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
-  const stopTimeoutRef = useRef<number | null>(null);
+  const threatRecorderRef = useRef<MediaRecorder | null>(null);
+  const sessionRecorderRef = useRef<MediaRecorder | null>(null);
+  const prebufferRecorderRef = useRef<MediaRecorder | null>(null);
+  const threatChunksRef = useRef<BlobPart[]>([]);
+  const sessionChunksRef = useRef<BlobPart[]>([]);
+  const prebufferWindowRef = useRef<Array<{ t: number; data: Blob }>>([]);
+  const stopThreatTimeoutRef = useRef<number | null>(null);
+  const stopSessionTimeoutRef = useRef<number | null>(null);
   const lastHandledRecordTokenRef = useRef(0);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSessionRecording, setIsSessionRecording] = useState(false);
+
+  const RECORD_TIMESLICE_MS = 1000;
+  const THREAT_CLIP_MS = 12_000;
+  const PREBUFFER_MS = 5_000;
+
+  const stopRecorderSafe = (recorder: MediaRecorder | null) => {
+    try {
+      if (recorder && recorder.state !== 'inactive') recorder.stop();
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     let isCancelled = false;
@@ -113,12 +131,13 @@ const CameraFeed: React.FC<CameraFeedProps> = ({
 
     return () => {
       isCancelled = true;
-      if (stopTimeoutRef.current) {
-        clearTimeout(stopTimeoutRef.current);
-      }
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        recorderRef.current.stop();
-      }
+      if (stopThreatTimeoutRef.current) clearTimeout(stopThreatTimeoutRef.current);
+      if (stopSessionTimeoutRef.current) clearTimeout(stopSessionTimeoutRef.current);
+
+      stopRecorderSafe(threatRecorderRef.current);
+      stopRecorderSafe(prebufferRecorderRef.current);
+      stopRecorderSafe(sessionRecorderRef.current);
+
       if (videoRef.current?.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
@@ -155,52 +174,145 @@ const CameraFeed: React.FC<CameraFeedProps> = ({
   }, [isScanning, isPrimary, streamError, onFrameCapture]);
 
   useEffect(() => {
+    if (!isPrimary || streamError) return;
+    if (!streamRef.current || typeof MediaRecorder === 'undefined') return;
+
+    const shouldRecord = isScanning;
+    if (!shouldRecord) {
+      stopRecorderSafe(prebufferRecorderRef.current);
+      stopRecorderSafe(sessionRecorderRef.current);
+      return;
+    }
+
+    // Start continuous session recording (full-session clip)
+    if (!sessionRecorderRef.current || sessionRecorderRef.current.state === 'inactive') {
+      try {
+        const sessionStream = streamRef.current.clone();
+        const recorder = new MediaRecorder(sessionStream, { mimeType: 'video/webm' });
+        sessionRecorderRef.current = recorder;
+        sessionChunksRef.current = [];
+
+        recorder.ondataavailable = (event: BlobEvent) => {
+          if (event.data.size > 0) sessionChunksRef.current.push(event.data);
+        };
+
+        recorder.onstop = () => {
+          setIsSessionRecording(false);
+          try {
+            sessionStream.getTracks().forEach((t) => t.stop());
+          } catch {
+            // ignore
+          }
+          if (sessionChunksRef.current.length === 0) return;
+          const blob = new Blob(sessionChunksRef.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          onRecordingReady?.({ url, sourceLabel: cameraLabel, recordingType: 'session', reason: 'Full scanning session' });
+          sessionChunksRef.current = [];
+        };
+
+        recorder.start(RECORD_TIMESLICE_MS);
+        setIsSessionRecording(true);
+      } catch (error) {
+        errorService.log({
+          type: ErrorType.CAMERA,
+          severity: ErrorSeverity.MEDIUM,
+          message: `${cameraLabel}: Session recording initialization failed`,
+          context: { error }
+        });
+      }
+    }
+
+    // Start pre-buffer recording (rolling window for threat clips)
+    if (!prebufferRecorderRef.current || prebufferRecorderRef.current.state === 'inactive') {
+      try {
+        const preStream = streamRef.current.clone();
+        const recorder = new MediaRecorder(preStream, { mimeType: 'video/webm' });
+        prebufferRecorderRef.current = recorder;
+        prebufferWindowRef.current = [];
+
+        recorder.ondataavailable = (event: BlobEvent) => {
+          if (event.data.size <= 0) return;
+          const now = Date.now();
+          const blob = event.data;
+          prebufferWindowRef.current.push({ t: now, data: blob });
+          const cutoff = now - PREBUFFER_MS;
+          while (prebufferWindowRef.current.length > 0 && prebufferWindowRef.current[0]!.t < cutoff) {
+            prebufferWindowRef.current.shift();
+          }
+        };
+
+        recorder.onstop = () => {
+          try {
+            preStream.getTracks().forEach((t) => t.stop());
+          } catch {
+            // ignore
+          }
+        };
+
+        recorder.start(RECORD_TIMESLICE_MS);
+      } catch (error) {
+        errorService.log({
+          type: ErrorType.CAMERA,
+          severity: ErrorSeverity.LOW,
+          message: `${cameraLabel}: Prebuffer recording initialization failed`,
+          context: { error }
+        });
+      }
+    }
+  }, [isScanning, isPrimary, streamError, onRecordingReady, cameraLabel]);
+
+  useEffect(() => {
     if (recordTriggerToken <= 0 || !isPrimary || streamError) return;
     if (recordTriggerToken === lastHandledRecordTokenRef.current) return;
     if (!streamRef.current || typeof MediaRecorder === 'undefined') return;
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') return;
+    if (threatRecorderRef.current && threatRecorderRef.current.state !== 'inactive') return;
+
+    lastHandledRecordTokenRef.current = recordTriggerToken;
 
     try {
-      const recorder = new MediaRecorder(streamRef.current, { mimeType: 'video/webm' });
-      recorderRef.current = recorder;
-      chunksRef.current = [];
+      const threatStream = streamRef.current.clone();
+      const recorder = new MediaRecorder(threatStream, { mimeType: 'video/webm' });
+      threatRecorderRef.current = recorder;
+      threatChunksRef.current = [];
+
+      // Seed with pre-buffer window (capture the seconds BEFORE detection).
+      const pre = prebufferWindowRef.current.map((x) => x.data);
+      threatChunksRef.current.push(...pre);
 
       recorder.ondataavailable = (event: BlobEvent) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) threatChunksRef.current.push(event.data);
       };
 
       recorder.onstop = () => {
         setIsRecording(false);
-        if (chunksRef.current.length === 0) return;
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        try {
+          threatStream.getTracks().forEach((t) => t.stop());
+        } catch {
+          // ignore
+        }
+        if (threatChunksRef.current.length === 0) return;
+        const blob = new Blob(threatChunksRef.current, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
-        onRecordingReady?.({ url, sourceLabel: cameraLabel });
-        chunksRef.current = [];
+        onRecordingReady?.({ url, sourceLabel: cameraLabel, recordingType: 'threat-clip' });
+        threatChunksRef.current = [];
       };
 
-      recorder.start(1000);
+      recorder.start(RECORD_TIMESLICE_MS);
       setIsRecording(true);
-      lastHandledRecordTokenRef.current = recordTriggerToken;
-      stopTimeoutRef.current = window.setTimeout(() => {
-        if (recorder.state !== 'inactive') {
-          recorder.stop();
-        }
-      }, 12000);
+      stopThreatTimeoutRef.current = window.setTimeout(() => {
+        stopRecorderSafe(recorder);
+      }, THREAT_CLIP_MS);
     } catch (error) {
       errorService.log({
         type: ErrorType.CAMERA,
         severity: ErrorSeverity.MEDIUM,
-        message: `${cameraLabel}: Recording initialization failed`,
+        message: `${cameraLabel}: Threat recording initialization failed`,
         context: { error }
       });
     }
 
     return () => {
-      if (stopTimeoutRef.current) {
-        clearTimeout(stopTimeoutRef.current);
-      }
+      if (stopThreatTimeoutRef.current) clearTimeout(stopThreatTimeoutRef.current);
     };
   }, [recordTriggerToken, isPrimary, streamError, onRecordingReady, cameraLabel]);
 
@@ -238,6 +350,12 @@ const CameraFeed: React.FC<CameraFeedProps> = ({
         <div className="absolute top-2 right-3 flex items-center space-x-1.5 bg-red-950/80 border border-red-500/50 px-2 py-0.5 rounded">
           <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
           <span className="text-red-300 font-mono text-[9px] font-bold">REC</span>
+        </div>
+      )}
+      {isSessionRecording && !isRecording && (
+        <div className="absolute top-2 right-3 flex items-center space-x-1.5 bg-cyan-950/70 border border-cyan-500/40 px-2 py-0.5 rounded">
+          <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span className="text-cyan-200 font-mono text-[9px] font-bold">SESSION</span>
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />

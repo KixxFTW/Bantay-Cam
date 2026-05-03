@@ -106,7 +106,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
-                placeholder="+639171234567"
+                placeholder="09171234567"
                 className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 sm:px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50 text-[12px]"
               />
               <button

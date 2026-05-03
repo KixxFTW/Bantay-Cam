@@ -15,7 +15,7 @@ import { useCameraDevices } from './hooks/useCameraDevices';
 import { useSensorData } from './hooks/useSensorData';
 import { useFrameAnalysis } from './hooks/useFrameAnalysis';
 import { useSecurityLogs } from './hooks/useSecurityLogs';
-import { useSMSAlerts } from './hooks/useSMSAlerts';
+import { useSMSAlerts, formatBantayCamThreatSmsBody } from './hooks/useSMSAlerts';
 
 const App: React.FC = () => {
   const [hasSession, setHasSession] = useState(false);
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [scanInterval, setScanInterval] = useState(3000);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [connectionAlert, setConnectionAlert] = useState<string | null>(null);
+  const [threatAlert, setThreatAlert] = useState<string | null>(null);
   const [unhealthyCameraIds, setUnhealthyCameraIds] = useState<Set<DeviceId>>(new Set());
   const [isMobileLogOpen, setIsMobileLogOpen] = useState(false);
   const [recordings, setRecordings] = useState<ThreatRecording[]>([]);
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const recordingsRef = useRef<ThreatRecording[]>([]);
   const lastSensorDangerLevelRef = useRef<'LOW' | 'MEDIUM' | 'HIGH'>('LOW');
   const lastSensorLogAtRef = useRef(0);
+  const lastThreatToastAtRef = useRef(0);
 
   // Hook orchestration
   const { cameraSources, primaryCameraId, setPrimaryCameraId, isLoading: isHardwareLoading } = useCameraDevices();
@@ -64,6 +66,12 @@ const App: React.FC = () => {
     onAnalysisComplete: (result) => {
       addLog(result);
       void handleSmsAnalysis(result);
+      const threatBody = formatBantayCamThreatSmsBody(result);
+      const now = Date.now();
+      if (threatBody && now - lastThreatToastAtRef.current > 6000) {
+        lastThreatToastAtRef.current = now;
+        setThreatAlert(threatBody);
+      }
       const hasThreat = result.status !== SecurityStatus.SAFE;
       const canRecord = Date.now() - lastRecordingAtRef.current > 15_000;
       if (hasThreat && canRecord) {
@@ -78,15 +86,16 @@ const App: React.FC = () => {
     rateLimitMs: 3000
   });
 
-  const handleRecordingReady = useCallback((payload: { url: string; sourceLabel: string }) => {
+  const handleRecordingReady = useCallback((payload: { url: string; sourceLabel: string; recordingType: ThreatRecording['recordingType']; reason?: string }) => {
     setRecordings((prev) => {
       const next = [
         {
           id: crypto.randomUUID(),
           createdAt: new Date().toLocaleString(),
           sourceLabel: payload.sourceLabel,
-          reason: lastRecordingReason,
+          reason: payload.reason ?? lastRecordingReason,
           url: payload.url,
+          recordingType: payload.recordingType,
         },
         ...prev,
       ].slice(0, 10);
@@ -101,6 +110,16 @@ const App: React.FC = () => {
       return next;
     });
   }, [lastRecordingReason]);
+
+  const handleDeleteRecording = useCallback((id: string) => {
+    setRecordings((prev) => {
+      const target = prev.find((r) => r.id === id);
+      if (target) {
+        URL.revokeObjectURL(target.url);
+      }
+      return prev.filter((r) => r.id !== id);
+    });
+  }, []);
 
   // Reset unhealthy cameras when hardware list changes
   useEffect(() => {
@@ -243,9 +262,16 @@ const App: React.FC = () => {
       <div className="flex h-screen w-full bg-slate-950 overflow-hidden text-slate-200 flex-col md:flex-row">
         
         {connectionAlert && (
-          <SMSNotification 
-            message={connectionAlert} 
-            onDismiss={() => setConnectionAlert(null)} 
+          <SMSNotification
+            message={connectionAlert}
+            onDismiss={() => setConnectionAlert(null)}
+          />
+        )}
+        {threatAlert && (
+          <SMSNotification
+            message={threatAlert}
+            onDismiss={() => setThreatAlert(null)}
+            positionClassName={connectionAlert ? 'top-36' : 'top-4'}
           />
         )}
 
@@ -410,6 +436,7 @@ const App: React.FC = () => {
           <LiveLog 
             logs={logs} 
             recordings={recordings}
+            onDeleteRecording={handleDeleteRecording}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onClear={clearLogs}
@@ -439,6 +466,8 @@ const App: React.FC = () => {
               <div className="flex-1 overflow-y-auto">
                 <LiveLog 
                   logs={logs} 
+                  recordings={recordings}
+                  onDeleteRecording={handleDeleteRecording}
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                   onClear={clearLogs}

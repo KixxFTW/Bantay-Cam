@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { LogEntry, SecurityStatus } from '../types';
-import { smsProxyService } from '../services/smsProxyService';
+import { smsProxyService, normalizePhilippineMobileForSms } from '../services/smsProxyService';
 import { errorService } from '../services/errorService';
 import { ErrorType, ErrorSeverity } from '../types';
 
@@ -21,10 +21,37 @@ const CRITICAL_HAZARD_PATTERN = /\b(knife|gun|fire|smoke)\b/i;
 const hasCriticalThreatText = (value: string | undefined) =>
   Boolean(value && CRITICAL_HAZARD_PATTERN.test(value));
 
+/** Detection SMS + in-app alert copy (single message for CAUTION/DANGER). */
+export const BANTAYCAM_DETECTION_SMS_MESSAGE =
+  'BantayCAM Alert: A potential threat has been detected. Please check your CCTV footage as soon as possible.';
+
+/** Same body sent as SMS; used by in-app alert UI. */
+export function formatBantayCamThreatSmsBody(result: LogEntry): string | null {
+  const hasCriticalHazard = result.hazards.some(hasCriticalThreatText);
+  const hasCriticalAction = hasCriticalThreatText(result.action);
+  const shouldEscalateToDanger =
+    result.status === SecurityStatus.DANGER || hasCriticalHazard || hasCriticalAction;
+  if (!shouldEscalateToDanger && result.status !== SecurityStatus.CAUTION) return null;
+
+  return BANTAYCAM_DETECTION_SMS_MESSAGE;
+}
+
+const loadRecipientsFromStorage = (): string[] => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('sms_recipients') || '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((n): n is string => typeof n === 'string')
+      .map((n) => normalizePhilippineMobileForSms(n));
+  } catch {
+    return [];
+  }
+};
+
 export const useSMSAlerts = () => {
   const [config, setConfig] = useState<SMSConfig>({
     enabled: localStorage.getItem('sms_enabled') === 'true',
-    recipients: JSON.parse(localStorage.getItem('sms_recipients') || '[]') as string[],
+    recipients: loadRecipientsFromStorage(),
     dangerCooldownMs: parseInt(localStorage.getItem('sms_danger_cooldown') || '180000', 10), // 3min
     cautionCooldownMs: parseInt(localStorage.getItem('sms_caution_cooldown') || '300000', 10), // 5min
   });
@@ -55,14 +82,11 @@ export const useSMSAlerts = () => {
     if (!trimmed.match(/^(\+63|0)9\d{9}$/)) {
       return {
         ok: false,
-        error: 'Invalid PH number. Use format: +639171234567 or 09171234567'
+        error: 'Invalid PH number. Use format: 09171234567 (+639171234567 also accepted)'
       };
     }
 
-    // Normalize to +63 format
-    const normalized = trimmed.startsWith('0') 
-      ? '+63' + trimmed.slice(1)
-      : trimmed;
+    const normalized = normalizePhilippineMobileForSms(trimmed);
 
     if (config.recipients.includes(normalized)) {
       return { ok: false, error: 'This number is already added.' };
@@ -140,13 +164,14 @@ export const useSMSAlerts = () => {
   }, [config.recipients]);
 
   const handleAnalysisResult = useCallback(async (result: LogEntry) => {
+    const alertMessage = formatBantayCamThreatSmsBody(result);
+    if (!alertMessage) return;
     if (!config.enabled || config.recipients.length === 0) return;
+
     const hasCriticalHazard = result.hazards.some(hasCriticalThreatText);
     const hasCriticalAction = hasCriticalThreatText(result.action);
     const shouldEscalateToDanger =
       result.status === SecurityStatus.DANGER || hasCriticalHazard || hasCriticalAction;
-    if (!shouldEscalateToDanger && result.status !== SecurityStatus.CAUTION) return;
-
     const severity = shouldEscalateToDanger ? 'DANGER' : 'CAUTION';
     const cooldownKey = `${severity.toLowerCase()}_last_alert`;
     const cooldownMs = severity === 'DANGER' ? config.dangerCooldownMs : config.cautionCooldownMs;
@@ -158,10 +183,6 @@ export const useSMSAlerts = () => {
     }
 
     setLastAlertTime(prev => ({ ...prev, [cooldownKey]: now }));
-
-    const emoji = severity === 'DANGER' ? '🚨' : '⚠️';
-    const hazardSummary = result.hazards.length > 0 ? result.hazards.join(', ') : 'No hazard details';
-    const alertMessage = `${emoji} BantayCam Alert\n\n${severity}: ${hazardSummary}\nAction: ${result.action}\nTime: ${new Date().toLocaleTimeString()}`;
 
     try {
       await Promise.all(

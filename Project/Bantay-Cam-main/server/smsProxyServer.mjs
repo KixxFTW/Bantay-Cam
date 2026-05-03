@@ -65,6 +65,18 @@ const parseBody = (req) =>
   });
 
 const server = http.createServer(async (req, res) => {
+  if (req.method === 'GET' && req.url === '/api/sms/health') {
+    const ok = Boolean(IPROG_API_TOKEN && String(IPROG_API_TOKEN).trim());
+    return sendJson(res, ok ? 200 : 500, {
+      success: ok,
+      error: ok ? undefined : 'Server IPROG API token is not configured',
+      data: {
+        provider: IPROG_SMS_PROVIDER || null,
+        apiBase: IPROG_API_BASE,
+      },
+    });
+  }
+
   if (req.method === 'POST' && req.url === '/api/sms/send') {
     if (!IPROG_API_TOKEN) {
       return sendJson(res, 500, {

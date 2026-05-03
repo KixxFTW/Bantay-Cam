@@ -69,6 +69,7 @@ export interface ThreatRecording {
   readonly sourceLabel: string;
   readonly reason: string;
   readonly url: string;
+  readonly recordingType: 'session' | 'threat-clip';
 }
 
 export interface CameraSource {
