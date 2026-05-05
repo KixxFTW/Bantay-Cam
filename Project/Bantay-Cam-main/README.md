@@ -51,7 +51,7 @@
 |---|---|
 | UI Framework | React 19 + TypeScript 5.8 |
 | Build Tool | Vite 6 |
-| Styling | Tailwind CSS (CDN) |
+| Styling | Tailwind CSS (via Vite plugin) |
 | AI Vision | Google Gemini Flash (via `@google/genai`) |
 | Runtime Validation | Zod 3 |
 | Font | JetBrains Mono + Inter (Google Fonts) |
@@ -95,12 +95,12 @@ bantay-cam/
 ### Prerequisites
 
 - Node.js 20+
-- A [Google AI Studio](https://aistudio.google.com) API key with access to Gemini Flash
+- A [Google AI Studio](https://aistudio.google.com) API key (Gemini)
 
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/bantay-cam.git
+git clone <https://github.com/KixxFTW/Bantay-Cam>
 cd bantay-cam
 npm install
 ```
@@ -111,7 +111,17 @@ Create a `.env.local` file in the project root:
 
 ```env
 GEMINI_API_KEY=your_api_key_here
+IPROG_API_TOKEN=your_iprog_token_here
+IPROG_SMS_PROVIDER=0
 ```
+
+#### Environment variables
+
+- **`GEMINI_API_KEY`**: Google Gemini API key used by the vision analysis.
+- **`IPROG_API_TOKEN`**: Token used by the SMS provider integration (used by the `/api/sms/*` routes).
+- **`IPROG_SMS_PROVIDER`**: SMS provider selector (currently `0` in this repo).
+
+> **Security note**: never commit real keys/tokens. If a secret was committed accidentally, rotate it immediately.
 
 ### Run
 
@@ -119,7 +129,23 @@ GEMINI_API_KEY=your_api_key_here
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Grant camera permissions when prompted.
+Open the Vite dev server URL (typically `http://localhost:5173`). Grant camera permissions when prompted.
+
+#### Optional: run the local SMS proxy
+
+If you’re developing the SMS API locally (and need a server process in addition to Vite), start:
+
+```bash
+npm run dev:proxy
+```
+
+---
+
+## API (SMS)
+
+This repo includes serverless-style endpoints under `api/` (deployed on Vercel, and usable locally depending on your setup).
+
+- **`POST /api/sms/send`**: sends an SMS using the configured provider/token.
 
 ---
 
